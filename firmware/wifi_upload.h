@@ -1,48 +1,52 @@
 #ifndef WIFI_UPLOAD_H
 #define WIFI_UPLOAD_H
 
+#include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <FS.h>
 #include <SD_MMC.h>
-#include "network_config.h"   // brings in WIFI_* and IMG_UPLOAD_URL
+#include "network_config.h"   
 
-inline void ensureWiFi()
-{
-  if (WiFi.status() == WL_CONNECTED) return;
+inline String uploadImage(const String& localPath,
+                          uint8_t retries = 2,
+                          uint16_t timeout_ms = 10000) {
+  for (uint8_t attempt = 0; attempt <= retries; ++attempt) {
+    ensureWiFi();
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500); Serial.print('.');
-  }
-  Serial.println("\nWi-Fi connected → " + WiFi.localIP().toString());
-}
+    File pic = SD_MMC.open(localPath, FILE_READ);
+    if (!pic) {
+      Serial.println("uploadImage: failed to open JPEG on SD");
+      return "";
+    }
 
-/** Uploads a local JPEG file to the web server.  
- *  Returns the URL returned by the PHP script or empty on failure. */
-inline String uploadImage(const String& localPath)
-{
-  ensureWiFi();
+    HTTPClient http;
+    http.setTimeout(timeout_ms);
 
-  HTTPClient http;
-  http.begin(IMG_UPLOAD_URL);
-  http.addHeader("Content-Type", "image/jpeg");
+    if (!http.begin(IMG_UPLOAD_URL)) {
+      Serial.println("uploadImage: http.begin() failed");
+      pic.close();
+      delay(300);
+      continue;
+    }
 
-  File pic = SD_MMC.open(localPath, FILE_READ);
-  if (!pic) { Serial.println("Failed to open JPEG for upload."); return ""; }
+    http.addHeader("Content-Type", "image/jpeg");
 
-  int code = http.sendRequest("POST", &pic, pic.size());
-  pic.close();
+    int code = http.sendRequest("POST", &pic, pic.size());
+    String body = (code > 0) ? http.getString() : "";
 
-  if (code == 200) {
-    String url = http.getString();
-    Serial.println("Upload OK → " + url);
     http.end();
-    return url;
+    pic.close();
+
+    if (code == 200 && body.length() && body.startsWith("http")) {
+      Serial.println("Upload OK: " + body);
+      return body;
+    }
+
+    Serial.printf("uploadImage: HTTP %d, resp: %s\n", code, body.c_str());
+    delay(500); 
   }
-  Serial.printf("Upload failed [%d]\n", code);
-  http.end();
   return "";
 }
 
-#endif
+#endif // WIFI_UPLOAD_H

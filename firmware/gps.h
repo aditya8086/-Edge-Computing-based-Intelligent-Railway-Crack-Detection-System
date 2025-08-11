@@ -1,44 +1,57 @@
 #ifndef GPS_H
 #define GPS_H
 
-#include <SoftwareSerial.h>
+#include <Arduino.h>
+#include <HardwareSerial.h>
+#include <TinyGPSPlus.h>
 
-// Define GPS RX and TX pins (adjust as needed for ESP32)
-#define GPS_RX_PIN 16
-#define GPS_TX_PIN 17
+#ifndef GPS_RX_PIN
+#define GPS_RX_PIN 33
+#endif
 
-// Initialize SoftwareSerial for GPS
-SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
+static HardwareSerial gpsSerial(1);
+static TinyGPSPlus gps;
 
-// Global variables to hold coordinates
-String latitude = "";
-String longitude = "";
-
-void initGPS() {
-  gpsSerial.begin(9600);
-  delay(1000);  // Wait for GPS module to stabilize
+inline void initGPS() {
+  gpsSerial.begin(9600, SERIAL_8N1, GPS_RX_PIN, -1);
 }
 
-// Simulate reading GPS data as if it's coming from NMEA sentence
-bool readGPS() {
-  while (gpsSerial.available()) {
-    String line = gpsSerial.readStringUntil('\n');
-    if (line.startsWith("$GPGGA")) {
-      // Simulated fixed coordinates (replace with real parsing if needed)
-      latitude = "28.6139";   // Simulated Latitude
-      longitude = "77.2090";  // Simulated Longitude
-      return true;
+inline String getGPSLocation(uint16_t read_ms = 800) {
+  unsigned long t0 = millis();
+  while (millis() - t0 < read_ms) {
+    while (gpsSerial.available()) {
+      gps.encode(gpsSerial.read());
     }
+  }
+
+  if (gps.location.isValid() && gps.location.age() < 5000) {
+    char buf[24];
+    String s = "Lat:";
+    dtostrf(gps.location.lat(), 0, 6, buf);
+    s += buf;
+    s += ", Lon:";
+    dtostrf(gps.location.lng(), 0, 6, buf);
+    s += buf;
+    return s;
+  }
+
+  return "GPS: NO FIX";
+}
+
+inline bool gpsHasFix(uint32_t max_age_ms = 5000) {
+  return gps.location.isValid() && gps.location.age() < max_age_ms;
+}
+
+inline bool waitForGPSFix(uint32_t timeout_ms = 30000) {
+  unsigned long t0 = millis();
+  while (millis() - t0 < timeout_ms) {
+    while (gpsSerial.available()) {
+      gps.encode(gpsSerial.read());
+    }
+    if (gpsHasFix()) return true;
+    delay(20);
   }
   return false;
 }
 
-String getGPSLocation() {
-  if (readGPS()) {
-    return "Lat: " + latitude + ", Lon: " + longitude;
-  } else {
-    return "GPS not fixed";
-  }
-}
-
-#endif
+#endif // GPS_H

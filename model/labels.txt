@@ -1,0 +1,3 @@
+Critical
+Moderate
+Non-Critical
