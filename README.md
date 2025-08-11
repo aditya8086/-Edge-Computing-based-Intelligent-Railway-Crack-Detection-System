@@ -5,7 +5,7 @@ This project implements an intelligent railway crack detection system **using Ed
 ## Overview
 
 **Ultrasonic sensor** measures the depth of cracks. A **TinyML model** is trained on depth values to classify severity.
-If the crack is classified as **severe**: A photo is captured using the **ESP32-CAM**. The image is uploaded to a server via **Wi-Fi**. An **SMS alert** is sent with **GPS coordinates** and**Image link** for verification.
+If the crack is classified as **severe**: A photo is captured using the **ESP32-CAM**. The image is uploaded to a server via **Wi-Fi**. An **SMS alert** is sent with **GPS coordinates** and **Image link** for verification.
 
 All computations happen **locally on the device**, making the system fast, offline-capable, and deployment-ready.
 
@@ -14,7 +14,7 @@ All computations happen **locally on the device**, making the system fast, offli
 
 
 - Crack detection using trained ML model
-- Critical crack classification using ultrasonic threshold
+- Severity classification with a TinyML model (depth-based)
 - Real-time image capture of detected cracks
 - Upload image to remote server via Wi-Fi
 - Send **SMS alert** with crack **severity + image link + GPS coordinates**
